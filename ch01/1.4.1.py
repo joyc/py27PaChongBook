@@ -13,17 +13,73 @@
 #         print 'I(%s) created a chlid process (%s).', (os.getpid(), pid)
 
 
-# 使用multiprocessing模块创建多进程
-import os
-from multiprocessing import Process
-# 子进程要执行的代码
-def run_proc(name):
-    print 'Child process %s (%s) Running...' % (name, os.getpid())
+'''使用multiprocessing模块创建多进程'''
+# import os
+# from multiprocessing import Process
+# # 子进程要执行的代码
+# def run_proc(name):
+#     print 'Child process %s (%s) Running...' % (name, os.getpid())
+# if __name__ == '__main__':
+#     print 'Parent process %s.' % os.getpid()
+#     for i in range(5):
+#         p = Process(target=run_proc, args=(str(i),))
+#         print 'Process will start.'
+#         p.start()
+#     p.join()
+#     print 'Process end.'
+
+'''multiprocessing模块提供了一个Pool类来代表进程池对象'''
+from multiprocessing import Pool
+import os, time, random
+
+def run_task(name):
+    print 'Task %s (pid= %s) is running...' %(name, os.getpid())
+    time.sleep(random.random() * 3)
+    print 'Task %s end.' % name
+
 if __name__ == '__main__':
-    print 'Parent process %s.' % os.getpid()
+    print 'Current process %s.' % os.getpid()
+    p = Pool(processes=3)
     for i in range(5):
-        p = Process(target=run_proc, args=(str(i),))
-        print 'Process will start.'
-        p.start()
+        p.apply_async(run_task, args=(i,))
+    print 'Waithing for all subprocess done...'
+    p.close()
     p.join()
-    print 'Process end.'
+    print 'All subprocesses done.'
+
+'''进程间的通信'''
+from multiprocessing import Process, Queue
+import os, time, random
+# 写数据进程执行的代码
+def proc_write(q, urls):
+    print('Process(%s) is writing...' % os.getpid())
+    for url in urls:
+        q.put(url)
+        print('Put %s to queue...' % url)
+        time.sleep(random.random())
+
+
+# 读数据进程执行的代码
+def proc_read(q):
+    print('Process(%s) is reading...' % os.getpid())
+    while True:
+        url = q.get(True)
+        print('Get %s from queue.' % url)
+
+
+if __name__ == '__main__':
+    # 父进程创建Queue，并传给各个子进程
+    q = Queue()
+    proc_write1 = Process(target=proc_write, args=(q, ['url_1', 'url_2', 'url_3']))
+    proc_write2 = Process(target=proc_write, args=(q, ['url_4', 'url_5', 'url_6']))
+    proc_reader = Process(target=proc_read, args=(q,))
+    # 启动子进程proc_writer，写入
+    proc_write1.start()
+    proc_write2.start()
+    # 启动子进程proc_reader，读取
+    proc_reader.start()
+    # 等待proc_writer结束
+    proc_write1.join()
+    proc_write2.join()
+    # proc_reader进程里是死循环，无法等待其结束，只能强行终止
+    proc_reader.terminate()
